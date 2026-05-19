@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.location.Location
 import android.os.Build
@@ -40,13 +41,14 @@ class MotionService : Service() {
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .build()
         
-        startForeground(1, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        } else {
+            startForeground(1, notification)
+        }
 
         setupOverlay()
         startLocationUpdates()
-        
-        // Run a loop to keep drawing continuous speed
-        startAnimationLoop()
     }
 
     private fun setupOverlay() {
@@ -69,10 +71,10 @@ class MotionService : Service() {
 
         layoutParams.gravity = Gravity.TOP or Gravity.START
         windowManager.addView(dotsOverlayView, layoutParams)
+        
+        // Start the animation loop directly on the View
+        dotsOverlayView?.startAnimation()
     }
-
-    private var currentSpeed = 0f
-    private var currentBearing = 0f
 
     private fun startLocationUpdates() {
         val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000)
@@ -82,12 +84,9 @@ class MotionService : Service() {
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
                 for (location in locationResult.locations) {
-                    if (location.hasSpeed()) {
-                        currentSpeed = location.speed
-                    }
-                    if (location.hasBearing()) {
-                        currentBearing = location.bearing
-                    }
+                    val speed = if (location.hasSpeed()) location.speed else 0f
+                    val bearing = if (location.hasBearing()) location.bearing else 0f
+                    dotsOverlayView?.updateMotionData(speed, bearing)
                 }
             }
         }
@@ -102,25 +101,19 @@ class MotionService : Service() {
             e.printStackTrace()
         }
     }
-    
-    private var isRunning = true
-    private fun startAnimationLoop() {
-        Thread {
-            while (isRunning) {
-                dotsOverlayView?.post {
-                    dotsOverlayView?.updateOffsets(currentSpeed, currentBearing)
-                }
-                Thread.sleep(16) // ~60fps
-            }
-        }.start()
-    }
 
     override fun onDestroy() {
         super.onDestroy()
-        isRunning = false
-        fusedLocationClient.removeLocationUpdates(locationCallback)
+        
+        try {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+        } catch (e: Exception) {}
+        
         if (dotsOverlayView != null) {
-            windowManager.removeView(dotsOverlayView)
+            try {
+                dotsOverlayView?.stopAnimation()
+                windowManager.removeView(dotsOverlayView)
+            } catch (e: Exception) {}
         }
     }
 

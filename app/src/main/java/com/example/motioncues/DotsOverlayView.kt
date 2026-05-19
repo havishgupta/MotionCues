@@ -9,31 +9,60 @@ import android.view.View
 class DotsOverlayView(context: Context) : View(context) {
 
     private val dotPaint = Paint().apply {
-        color = Color.WHITE
+        color = Color.BLACK
         isAntiAlias = true
         style = Paint.Style.FILL
     }
     
+    private val outlinePaint = Paint().apply {
+        color = Color.WHITE
+        isAntiAlias = true
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
+
     private val bgPaint = Paint().apply {
         color = Color.TRANSPARENT
     }
 
-    var speedOffset: Float = 0f
-    var directionOffset: Float = 0f
+    private var speedOffset: Float = 0f
+    private var directionOffset: Float = 0f
 
-    private val dotRadius = 12f
+    private val dotRadius = 14f
     private val dotSpacing = 80f
-    private val numDotsY = 30
+    private val numDotsY = 40
     private val numDotsX = 3
+
+    private var currentSpeed: Float = 0f
+    private var currentBearing: Float = 0f
+    private var isAnimating = false
+
+    private val animationRunnable = object : Runnable {
+        override fun run() {
+            if (!isAnimating) return
+            
+            // apply a minimum speed so the balls always move slowly downward
+            // to show that the overlay is functioning even without GPS speed.
+            speedOffset += (currentSpeed * 2f).coerceAtLeast(1f)
+            
+            // Map 0-360 bearing to a subtle left/right sway
+            val directionRad = Math.toRadians(currentBearing.toDouble())
+            val targetOffset = Math.sin(directionRad).toFloat()
+            directionOffset += (targetOffset - directionOffset) * 0.1f // smooth interpolation
+            
+            invalidate()
+            postOnAnimation(this)
+        }
+    }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
-        // Calculate continuous scrolling offset for Y (simulating speed)
+        // Make the scrolling wrap around seamlessly
         val yShift = speedOffset % dotSpacing
         
-        // Calculate X offset based on direction (clamped for visual effect)
+        // Direction offset shifts X
         val maxOffset = 150f
         val currentXOffset = (directionOffset * maxOffset).coerceIn(-maxOffset, maxOffset)
 
@@ -46,26 +75,29 @@ class DotsOverlayView(context: Context) : View(context) {
 
     private fun drawDotGrid(canvas: Canvas, startX: Float, yShift: Float) {
         for (i in 0 until numDotsX) {
-            for (j in -2 until numDotsY) {
+            for (j in -5 until numDotsY) {
                 val x = startX + (i * dotSpacing)
                 val y = (j * dotSpacing) + yShift
                 canvas.drawCircle(x, y, dotRadius, dotPaint)
+                canvas.drawCircle(x, y, dotRadius, outlinePaint)
             }
         }
     }
 
-    fun updateOffsets(speed: Float, direction: Float) {
-        // Increment speed offset to make dots scroll continuously
-        // Speed is roughly m/s. We multiply by a factor to make it visible.
-        speedOffset += speed * 0.5f 
-        
-        // Direction from location is usually 0 to 360 (Bearing).
-        // Let's make the dots shift left/right based on the sine of the bearing 
-        // to represent North/South vs East/West.
-        // If bearing is 90 (East), sin is 1. If 270 (West), sin is -1.
-        val directionRad = Math.toRadians(direction.toDouble())
-        directionOffset = Math.sin(directionRad).toFloat()
-        
-        invalidate()
+    fun startAnimation() {
+        if (!isAnimating) {
+            isAnimating = true
+            postOnAnimation(animationRunnable)
+        }
+    }
+
+    fun stopAnimation() {
+        isAnimating = false
+        removeCallbacks(animationRunnable)
+    }
+
+    fun updateMotionData(speed: Float, bearing: Float) {
+        currentSpeed = speed
+        currentBearing = bearing
     }
 }
