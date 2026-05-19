@@ -24,8 +24,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -219,32 +219,42 @@ fun IntroScreen(onFinish: () -> Unit) {
 
 @Composable
 fun Slide1() {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+    
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(1000)) + scaleIn(initialScale = 0.8f, animationSpec = tween(1000))
     ) {
-        Text(
-            text = "MOTION",
-            fontSize = 54.sp,
-            fontWeight = FontWeight.Black,
-            color = MaterialTheme.colorScheme.primary,
-            letterSpacing = 2.sp
-        )
-        Text(
-            text = "CUES",
-            fontSize = 48.sp,
-            fontWeight = FontWeight.Light,
-            color = MaterialTheme.colorScheme.onBackground,
-            letterSpacing = 8.sp
-        )
-        Spacer(modifier = Modifier.height(32.dp))
-        Text(
-            "Welcome to a smoother journey.",
-            fontSize = 18.sp,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center
-        )
+        Column(
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "MOTION",
+                fontSize = 54.sp,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 2.sp
+            )
+            Text(
+                text = "CUES",
+                fontSize = 48.sp,
+                fontWeight = FontWeight.Light,
+                color = MaterialTheme.colorScheme.onBackground,
+                letterSpacing = 8.sp
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+            Text(
+                "Welcome to a smoother journey.",
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -252,19 +262,19 @@ fun Slide1() {
 fun Slide2() {
     val infiniteTransition = rememberInfiniteTransition(label = "eye_ear")
     val eyeOffset by infiniteTransition.animateFloat(
-        initialValue = -20f,
-        targetValue = 20f,
+        initialValue = -15f,
+        targetValue = 15f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
+            animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "eye"
     )
     val earOffset by infiniteTransition.animateFloat(
-        initialValue = 20f,
-        targetValue = -20f,
+        initialValue = 15f,
+        targetValue = -15f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1300, easing = FastOutSlowInEasing), // Out of sync timing
+            animation = tween(1500, easing = FastOutSlowInEasing), // Out of sync timing
             repeatMode = RepeatMode.Reverse
         ),
         label = "ear"
@@ -280,9 +290,24 @@ fun Slide2() {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("👁️", fontSize = 80.sp, modifier = Modifier.offset(y = eyeOffset.dp))
-            Text("⚡", fontSize = 40.sp)
-            Text("👂", fontSize = 80.sp, modifier = Modifier.offset(y = earOffset.dp))
+            Icon(
+                imageVector = Icons.Outlined.Visibility,
+                contentDescription = "Eyes",
+                modifier = Modifier.size(80.dp).offset(y = eyeOffset.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Icon(
+                imageVector = Icons.Default.Bolt,
+                contentDescription = "Mismatch",
+                modifier = Modifier.size(50.dp),
+                tint = Color(0xFFFBC02D) // Yellowish
+            )
+            Icon(
+                imageVector = Icons.Outlined.Hearing, // Hearing icon
+                contentDescription = "Ears",
+                modifier = Modifier.size(80.dp).offset(y = earOffset.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
         
         Spacer(modifier = Modifier.height(64.dp))
@@ -308,10 +333,10 @@ fun Slide2() {
 fun Slide3() {
     val infiniteTransition = rememberInfiniteTransition(label = "dots")
     val dotOffset by infiniteTransition.animateFloat(
-        initialValue = -80f,
-        targetValue = 80f,
+        initialValue = -60f,
+        targetValue = 60f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
+            animation = tween(2500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "dot"
@@ -330,17 +355,23 @@ fun Slide3() {
                 .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.SpaceEvenly
             ) {
-                repeat(3) {
-                    Box(modifier = Modifier
-                        .size(18.dp)
-                        .offset(x = dotOffset.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.5f))
-                    )
+                repeat(4) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().offset(x = dotOffset.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        repeat(5) {
+                            Box(modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.5f))
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -372,8 +403,8 @@ fun Slide4(onFinish: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
-            imageVector = Icons.Default.Settings,
-            contentDescription = null,
+            imageVector = Icons.Default.CheckCircle,
+            contentDescription = "Ready",
             modifier = Modifier.size(100.dp),
             tint = MaterialTheme.colorScheme.primary
         )
@@ -386,14 +417,24 @@ fun Slide4(onFinish: () -> Unit) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "You can turn Motion Cues on via this App, or conveniently through your Quick Settings tile in the notification panel.",
-            fontSize = 18.sp,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onBackground,
-            lineHeight = 24.sp
-        )
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.TouchApp, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(16.dp))
+                Text("Via this App interface", fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.SwipeDown, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(16.dp))
+                Text("Via the Quick Settings tile in your notification panel", fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground, lineHeight = 24.sp)
+            }
+        }
         
         Spacer(modifier = Modifier.height(64.dp))
         
