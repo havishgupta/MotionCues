@@ -11,10 +11,14 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,9 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -67,9 +73,15 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme(colorScheme = customTheme) {
+                var hasSeenIntro by remember { mutableStateOf(prefsManager.hasSeenIntro) }
                 var showSettings by remember { mutableStateOf(false) }
                 
-                if (showSettings) {
+                if (!hasSeenIntro) {
+                    IntroScreen(onFinish = {
+                        prefsManager.hasSeenIntro = true
+                        hasSeenIntro = true
+                    })
+                } else if (showSettings) {
                     SettingsScreen(
                         prefsManager = prefsManager,
                         onBack = { showSettings = false },
@@ -138,6 +150,259 @@ class MainActivity : ComponentActivity() {
                 Toast.makeText(this, "Please grant Overlay & Notification permissions in Settings first", Toast.LENGTH_LONG).show()
                 requestAllPermissions()
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun IntroScreen(onFinish: () -> Unit) {
+    val pagerState = rememberPagerState(pageCount = { 4 })
+    val coroutineScope = rememberCoroutineScope()
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f)
+            ) { page ->
+                when (page) {
+                    0 -> Slide1()
+                    1 -> Slide2()
+                    2 -> Slide3()
+                    3 -> Slide4(onFinish)
+                }
+            }
+
+            // Pager indicator
+            Row(
+                modifier = Modifier
+                    .wrapContentHeight()
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                repeat(4) { iteration ->
+                    val color = if (pagerState.currentPage == iteration) MaterialTheme.colorScheme.primary else Color.LightGray
+                    Box(
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .size(10.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (pagerState.currentPage < 3) {
+                TextButton(onClick = { 
+                    coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                }) {
+                    Text("NEXT", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Spacer(modifier = Modifier.height(48.dp)) // Reserve space to prevent jitter
+            }
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+fun Slide1() {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "MOTION",
+            fontSize = 54.sp,
+            fontWeight = FontWeight.Black,
+            color = MaterialTheme.colorScheme.primary,
+            letterSpacing = 2.sp
+        )
+        Text(
+            text = "CUES",
+            fontSize = 48.sp,
+            fontWeight = FontWeight.Light,
+            color = MaterialTheme.colorScheme.onBackground,
+            letterSpacing = 8.sp
+        )
+        Spacer(modifier = Modifier.height(32.dp))
+        Text(
+            "Welcome to a smoother journey.",
+            fontSize = 18.sp,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun Slide2() {
+    val infiniteTransition = rememberInfiniteTransition(label = "eye_ear")
+    val eyeOffset by infiniteTransition.animateFloat(
+        initialValue = -20f,
+        targetValue = 20f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = SineEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "eye"
+    )
+    val earOffset by infiniteTransition.animateFloat(
+        initialValue = 20f,
+        targetValue = -20f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1300, easing = SineEasing), // Out of sync timing
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ear"
+    )
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("👁️", fontSize = 80.sp, modifier = Modifier.offset(y = eyeOffset.dp))
+            Text("⚡", fontSize = 40.sp)
+            Text("👂", fontSize = 80.sp, modifier = Modifier.offset(y = earOffset.dp))
+        }
+        
+        Spacer(modifier = Modifier.height(64.dp))
+        
+        Text(
+            text = "The Problem",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Motion sickness occurs when what your eyes see doesn't match what your inner ear feels.",
+            fontSize = 18.sp,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground,
+            lineHeight = 24.sp
+        )
+    }
+}
+
+@Composable
+fun Slide3() {
+    val infiniteTransition = rememberInfiniteTransition(label = "dots")
+    val dotOffset by infiniteTransition.animateFloat(
+        initialValue = -80f,
+        targetValue = 80f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = SineEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dot"
+    )
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 240.dp, height = 160.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White)
+                .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                repeat(3) {
+                    Box(modifier = Modifier
+                        .size(18.dp)
+                        .offset(x = dotOffset.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.5f))
+                    )
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(64.dp))
+        
+        Text(
+            text = "The Solution",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Animated dots sync with your vehicle's motion to naturally realign your senses.",
+            fontSize = 18.sp,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground,
+            lineHeight = 24.sp
+        )
+    }
+}
+
+@Composable
+fun Slide4(onFinish: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Default.Settings,
+            contentDescription = null,
+            modifier = Modifier.size(100.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        
+        Spacer(modifier = Modifier.height(48.dp))
+        
+        Text(
+            text = "How to Start",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "You can turn Motion Cues on via this App, or conveniently through your Quick Settings tile in the notification panel.",
+            fontSize = 18.sp,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground,
+            lineHeight = 24.sp
+        )
+        
+        Spacer(modifier = Modifier.height(64.dp))
+        
+        Button(
+            onClick = onFinish,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+        ) {
+            Text("LET'S GO", fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

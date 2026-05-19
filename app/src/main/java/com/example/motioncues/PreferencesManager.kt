@@ -12,20 +12,24 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putInt("dot_color", value).apply()
 
     var dotSize: Float
-        get() = prefs.getFloat("dot_size", 14f)
+        get() = prefs.getFloat("dot_size", 15f)
         set(value) = prefs.edit().putFloat("dot_size", value).apply()
 
     var dotSpacing: Float
-        get() = prefs.getFloat("dot_spacing", 80f)
+        get() = prefs.getFloat("dot_spacing", 110f)
         set(value) = prefs.edit().putFloat("dot_spacing", value).apply()
         
     var dotOpacity: Float
-        get() = prefs.getFloat("dot_opacity", 1f)
+        get() = prefs.getFloat("dot_opacity", 0.5f)
         set(value) = prefs.edit().putFloat("dot_opacity", value).apply()
         
     var verticalRows: Int
-        get() = prefs.getInt("vertical_rows", 30)
+        get() = prefs.getInt("vertical_rows", 15)
         set(value) = prefs.edit().putInt("vertical_rows", value).apply()
+        
+    var hasSeenIntro: Boolean
+        get() = prefs.getBoolean("has_seen_intro", false)
+        set(value) = prefs.edit().putBoolean("has_seen_intro", value).apply()
         
     var tiltSensitivity: Float
         get() = prefs.getFloat("tilt_sensitivity", 1.0f)
