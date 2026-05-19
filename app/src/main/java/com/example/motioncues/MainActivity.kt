@@ -35,11 +35,13 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val allGranted = permissions.entries.all { it.value }
-        if (allGranted) {
-            Toast.makeText(this, "Permissions granted", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "Some permissions were denied", Toast.LENGTH_SHORT).show()
+        if (permissions.isNotEmpty()) {
+            val allGranted = permissions.entries.all { it.value }
+            if (allGranted) {
+                Toast.makeText(this, "Permissions granted", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Some permissions were denied", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -53,10 +55,10 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     topBar = {
                         TopAppBar(
-                            title = { Text("Vehicle Motion Cues") },
+                            title = { Text("Vehicle Motion Cues", fontWeight = FontWeight.Bold) },
                             colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                titleContentColor = MaterialTheme.colorScheme.onSurface
                             )
                         )
                     }
@@ -71,7 +73,9 @@ class MainActivity : ComponentActivity() {
                             prefsManager = prefsManager,
                             onStartService = { startMotionService() },
                             onStopService = { stopMotionService() },
-                            onRequestPermissions = { requestAllPermissions() }
+                            onRequestPermissions = { requestAllPermissions() },
+                            checkPermissions = { hasRequiredPermissions() },
+                            checkOverlay = { Settings.canDrawOverlays(this) }
                         )
                     }
                 }
@@ -152,7 +156,9 @@ fun MotionCuesScreen(
     prefsManager: PreferencesManager,
     onStartService: () -> Unit,
     onStopService: () -> Unit,
-    onRequestPermissions: () -> Unit
+    onRequestPermissions: () -> Unit,
+    checkPermissions: () -> Boolean,
+    checkOverlay: () -> Boolean
 ) {
     val scrollState = rememberScrollState()
 
@@ -169,6 +175,17 @@ fun MotionCuesScreen(
         android.graphics.Color.parseColor("#D32F2F")  // Red
     )
 
+    var locationGranted by remember { mutableStateOf(checkPermissions()) }
+    var overlayGranted by remember { mutableStateOf(checkOverlay()) }
+    
+    LaunchedEffect(Unit) {
+        while(true) {
+            locationGranted = checkPermissions()
+            overlayGranted = checkOverlay()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -182,11 +199,27 @@ fun MotionCuesScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Controls", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Setup & Controls", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(if (locationGranted) Color.Green else Color.Red))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (locationGranted) "Location: Granted" else "Location: Missing", fontWeight = FontWeight.Medium)
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(if (overlayGranted) Color.Green else Color.Red))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (overlayGranted) "Overlay: Granted" else "Overlay: Missing", fontWeight = FontWeight.Medium)
+                }
+                
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Button(onClick = onRequestPermissions, modifier = Modifier.fillMaxWidth()) {
-                    Text("1. Grant Permissions")
+                    Text("Grant Required Permissions")
                 }
                 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -195,15 +228,19 @@ fun MotionCuesScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Button(onClick = onStartService, modifier = Modifier.weight(1f)) {
-                        Text("2. Start")
+                    Button(
+                        onClick = onStartService, 
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("Start Cues")
                     }
                     Button(
                         onClick = onStopService, 
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                     ) {
-                        Text("Stop")
+                        Text("Stop Cues")
                     }
                 }
             }

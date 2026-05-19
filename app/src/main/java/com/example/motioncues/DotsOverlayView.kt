@@ -97,20 +97,24 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
         val rightCol1X = width - sideMargin - columnGap + tiltXOffset
         val rightCol2X = width - sideMargin + tiltXOffset
 
+        // Outer dots are larger
+        val outerRadius = dotRadius * 1.3f
+        val innerRadius = dotRadius * 0.8f
+
         for (j in -5 until numDotsY) {
             val baseY = (j * dotSpacing) + totalYShift
             
             // Column 1 (outer left, non-staggered)
-            drawDot(canvas, leftCol1X, baseY, dotRadius)
+            drawDot(canvas, leftCol1X, baseY, outerRadius)
             
             // Column 2 (inner left, staggered)
-            drawDot(canvas, leftCol2X, baseY + (dotSpacing / 2f), dotRadius)
+            drawDot(canvas, leftCol2X, baseY + (dotSpacing / 2f), innerRadius)
             
             // Column 3 (inner right, staggered)
-            drawDot(canvas, rightCol1X, baseY + (dotSpacing / 2f), dotRadius)
+            drawDot(canvas, rightCol1X, baseY + (dotSpacing / 2f), innerRadius)
             
             // Column 4 (outer right, non-staggered)
-            drawDot(canvas, rightCol2X, baseY, dotRadius)
+            drawDot(canvas, rightCol2X, baseY, outerRadius)
         }
     }
 
@@ -136,11 +140,14 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
     }
 
     fun updateTilt(accelX: Float, accelY: Float) {
-        // accelX is negative when tilted left, causing positive targetTiltX (moves right)
-        targetTiltX = (-accelX * 12f).coerceIn(-120f, 120f)
+        // In real motion cues, dots move opposite to acceleration to simulate visual surroundings
+        // Linear acceleration filters out gravity.
+        // X is lateral: -X means accelerating left (turning left). Dots should move right (+X).
+        targetTiltX = (-accelX * 30f).coerceIn(-150f, 150f)
         
-        // accelY is positive when tilted up, moving dots up/down based on orientation
-        targetTiltY = (accelY * 12f).coerceIn(-120f, 120f)
+        // Y is longitudinal (if flat) or vertical (if upright). 
+        // We assume positive accel means accelerating forward/up. Dots move backwards (down, +Y in canvas).
+        targetTiltY = (accelY * 30f).coerceIn(-150f, 150f)
     }
     
     override fun onDetachedFromWindow() {

@@ -47,7 +47,7 @@ class MotionService : Service(), SensorEventListener {
         
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
 
         createNotificationChannel()
         val notification = NotificationCompat.Builder(this, "MotionCuesChannel")
@@ -120,7 +120,7 @@ class MotionService : Service(), SensorEventListener {
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
-        if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
+        if (event?.sensor?.type == Sensor.TYPE_LINEAR_ACCELERATION) {
             val ax = event.values[0]
             val ay = event.values[1]
             dotsOverlayView?.updateTilt(ax, ay)
