@@ -27,6 +27,11 @@ import com.google.android.gms.location.Priority
 
 class MotionService : Service(), SensorEventListener {
 
+    companion object {
+        var isRunning = false
+            private set
+    }
+
     private lateinit var windowManager: WindowManager
     private var dotsOverlayView: DotsOverlayView? = null
     
@@ -34,14 +39,15 @@ class MotionService : Service(), SensorEventListener {
     private lateinit var locationCallback: LocationCallback
     
     private lateinit var sensorManager: SensorManager
-    private var gravitySensor: Sensor? = null
+    private var accelSensor: Sensor? = null
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        gravitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY)
+        accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
         createNotificationChannel()
         val notification = NotificationCompat.Builder(this, "MotionCuesChannel")
@@ -59,7 +65,7 @@ class MotionService : Service(), SensorEventListener {
         setupOverlay()
         startLocationUpdates()
         
-        gravitySensor?.let {
+        accelSensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
         }
     }
@@ -114,10 +120,10 @@ class MotionService : Service(), SensorEventListener {
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
-        if (event?.sensor?.type == Sensor.TYPE_GRAVITY) {
-            val gx = event.values[0]
-            val gy = event.values[1]
-            dotsOverlayView?.updateTilt(gx, gy)
+        if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
+            val ax = event.values[0]
+            val ay = event.values[1]
+            dotsOverlayView?.updateTilt(ax, ay)
         }
     }
 
@@ -126,6 +132,7 @@ class MotionService : Service(), SensorEventListener {
 
     override fun onDestroy() {
         super.onDestroy()
+        isRunning = false
         
         try {
             fusedLocationClient.removeLocationUpdates(locationCallback)

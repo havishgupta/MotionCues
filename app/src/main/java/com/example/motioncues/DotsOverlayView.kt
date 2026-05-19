@@ -36,6 +36,7 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
     private var targetTiltY: Float = 0f
 
     private var currentSpeed: Float = 0f
+    private var filteredSpeed: Float = 0f
     private var isAnimating = false
 
     init {
@@ -59,12 +60,15 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
         override fun run() {
             if (!isAnimating) return
             
-            // Continuous downward speed (baseline + GPS speed)
-            speedOffset += (currentSpeed * 2f).coerceAtLeast(0.5f)
+            // Smoothly interpolate speed so it doesn't jump
+            filteredSpeed += (currentSpeed - filteredSpeed) * 0.05f
+            
+            // Speed controls downward scrolling. If speed is 0, it doesn't scroll automatically.
+            speedOffset += filteredSpeed * 1.5f
             
             // Smoothly interpolate tilt (Low pass filter effect)
-            tiltXOffset += (targetTiltX - tiltXOffset) * 0.15f
-            tiltYOffset += (targetTiltY - tiltYOffset) * 0.15f
+            tiltXOffset += (targetTiltX - tiltXOffset) * 0.1f
+            tiltYOffset += (targetTiltY - tiltYOffset) * 0.1f
             
             invalidate()
             postOnAnimation(this)
@@ -131,13 +135,12 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
         currentSpeed = speed
     }
 
-    // gravityX and gravityY from sensor
-    fun updateTilt(gravityX: Float, gravityY: Float) {
-        // gravityX is negative when left side tilts down. We want dots to move right (+X)
-        targetTiltX = -gravityX * 20f
+    fun updateTilt(accelX: Float, accelY: Float) {
+        // accelX is negative when tilted left, causing positive targetTiltX (moves right)
+        targetTiltX = (-accelX * 12f).coerceIn(-120f, 120f)
         
-        // gravityY is positive when top is up. We want tilt forwards/backwards to shift dots.
-        targetTiltY = gravityY * 20f 
+        // accelY is positive when tilted up, moving dots up/down based on orientation
+        targetTiltY = (accelY * 12f).coerceIn(-120f, 120f)
     }
     
     override fun onDetachedFromWindow() {
