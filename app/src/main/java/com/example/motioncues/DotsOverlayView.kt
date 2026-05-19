@@ -27,16 +27,12 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
         color = Color.TRANSPARENT
     }
 
-    private var speedOffset: Float = 0f
-    
     private var tiltXOffset: Float = 0f
     private var tiltYOffset: Float = 0f
 
     private var targetTiltX: Float = 0f
     private var targetTiltY: Float = 0f
 
-    private var currentSpeed: Float = 0f
-    private var filteredSpeed: Float = 0f
     private var isAnimating = false
 
     init {
@@ -60,15 +56,9 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
         override fun run() {
             if (!isAnimating) return
             
-            // Smoothly interpolate speed so it doesn't jump
-            filteredSpeed += (currentSpeed - filteredSpeed) * 0.05f
-            
-            // Speed controls downward scrolling. If speed is 0, it doesn't scroll automatically.
-            speedOffset += filteredSpeed * 1.5f * prefsManager.speedMultiplier
-            
             // Smoothly interpolate tilt (Low pass filter effect)
-            tiltXOffset += (targetTiltX - tiltXOffset) * 0.1f * prefsManager.tiltSensitivity
-            tiltYOffset += (targetTiltY - tiltYOffset) * 0.1f * prefsManager.tiltSensitivity
+            tiltXOffset += (targetTiltX - tiltXOffset) * 0.1f * prefsManager.speedMultiplier
+            tiltYOffset += (targetTiltY - tiltYOffset) * 0.1f * prefsManager.speedMultiplier
             
             invalidate()
             postOnAnimation(this)
@@ -83,11 +73,9 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
         val dotSpacing = prefsManager.dotSpacing
         val numDotsY = prefsManager.verticalRows
         
-        val totalYShift = (speedOffset + tiltYOffset) % dotSpacing
-        
-        // Define margins
-        val sideMargin = 30f
-        val columnGap = dotRadius * 2.5f
+        // Increased margin so dots have huge space to slide into
+        val sideMargin = 80f
+        val columnGap = dotRadius * 3.5f
 
         // Draw Left Side (2 columns)
         val leftCol1X = sideMargin + tiltXOffset
@@ -98,11 +86,12 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
         val rightCol2X = width - sideMargin + tiltXOffset
 
         // Outer dots are larger
-        val outerRadius = dotRadius * 1.3f
+        val outerRadius = dotRadius * 1.5f
         val innerRadius = dotRadius * 0.8f
 
-        for (j in -5 until numDotsY) {
-            val baseY = (j * dotSpacing) + totalYShift
+        // Massive iteration window so when it shifts 1000px up/down, you never see the end of the dots
+        for (j in -30 until numDotsY + 30) {
+            val baseY = (j * dotSpacing) + tiltYOffset
             
             // Column 1 (outer left, non-staggered)
             drawDot(canvas, leftCol1X, baseY, outerRadius)
@@ -135,19 +124,10 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
         removeCallbacks(animationRunnable)
     }
 
-    fun updateMotionData(speed: Float) {
-        currentSpeed = speed
-    }
-
     fun updateTilt(accelX: Float, accelY: Float) {
-        // In real motion cues, dots move opposite to acceleration to simulate visual surroundings
-        // Linear acceleration filters out gravity.
-        // X is lateral: -X means accelerating left (turning left). Dots should move right (+X).
-        targetTiltX = (-accelX * 30f).coerceIn(-150f, 150f)
-        
-        // Y is longitudinal (if flat) or vertical (if upright). 
-        // We assume positive accel means accelerating forward/up. Dots move backwards (down, +Y in canvas).
-        targetTiltY = (accelY * 30f).coerceIn(-150f, 150f)
+        // Massive limits allowing for extreme visual sliding across screen
+        targetTiltX = (-accelX * 60f * prefsManager.tiltSensitivity).coerceIn(-800f, 800f)
+        targetTiltY = (accelY * 60f * prefsManager.tiltSensitivity).coerceIn(-1200f, 1200f)
     }
     
     override fun onDetachedFromWindow() {

@@ -5,25 +5,16 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.location.Location
 import android.os.Build
 import android.os.IBinder
-import android.os.Looper
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
 
 class MotionService : Service(), SensorEventListener {
 
@@ -35,9 +26,6 @@ class MotionService : Service(), SensorEventListener {
     private lateinit var windowManager: WindowManager
     private var dotsOverlayView: DotsOverlayView? = null
     
-    private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private lateinit var locationCallback: LocationCallback
-    
     private lateinit var sensorManager: SensorManager
     private var accelSensor: Sensor? = null
 
@@ -45,7 +33,6 @@ class MotionService : Service(), SensorEventListener {
         super.onCreate()
         isRunning = true
         
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
 
@@ -56,14 +43,13 @@ class MotionService : Service(), SensorEventListener {
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .build()
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        if (Build.VERSION.SDK_INT >= 34) { // UPSIDE_DOWN_CAKE
+            startForeground(1, notification, 1073741824) // FOREGROUND_SERVICE_TYPE_SPECIAL_USE
         } else {
             startForeground(1, notification)
         }
 
         setupOverlay()
-        startLocationUpdates()
         
         accelSensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
@@ -94,31 +80,6 @@ class MotionService : Service(), SensorEventListener {
         dotsOverlayView?.startAnimation()
     }
 
-    private fun startLocationUpdates() {
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000)
-            .setMinUpdateIntervalMillis(500)
-            .build()
-
-        locationCallback = object : LocationCallback() {
-            override fun onLocationResult(locationResult: LocationResult) {
-                for (location in locationResult.locations) {
-                    val speed = if (location.hasSpeed()) location.speed else 0f
-                    dotsOverlayView?.updateMotionData(speed)
-                }
-            }
-        }
-
-        try {
-            fusedLocationClient.requestLocationUpdates(
-                locationRequest,
-                locationCallback,
-                Looper.getMainLooper()
-            )
-        } catch (e: SecurityException) {
-            e.printStackTrace()
-        }
-    }
-
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_LINEAR_ACCELERATION) {
             val ax = event.values[0]
@@ -127,16 +88,11 @@ class MotionService : Service(), SensorEventListener {
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-    }
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
-        
-        try {
-            fusedLocationClient.removeLocationUpdates(locationCallback)
-        } catch (e: Exception) {}
         
         sensorManager.unregisterListener(this)
         
