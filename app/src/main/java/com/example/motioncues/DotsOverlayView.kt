@@ -1,15 +1,17 @@
 package com.example.motioncues
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.view.View
 
-class DotsOverlayView(context: Context) : View(context) {
+class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSharedPreferenceChangeListener {
+
+    private val prefsManager = PreferencesManager(context)
 
     private val dotPaint = Paint().apply {
-        color = Color.BLACK
         isAntiAlias = true
         style = Paint.Style.FILL
     }
@@ -26,29 +28,43 @@ class DotsOverlayView(context: Context) : View(context) {
     }
 
     private var speedOffset: Float = 0f
-    private var directionOffset: Float = 0f
+    
+    private var tiltXOffset: Float = 0f
+    private var tiltYOffset: Float = 0f
 
-    private val dotRadius = 14f
-    private val dotSpacing = 80f
-    private val numDotsY = 40
-    private val numDotsX = 3
+    private var targetTiltX: Float = 0f
+    private var targetTiltY: Float = 0f
 
     private var currentSpeed: Float = 0f
-    private var currentBearing: Float = 0f
     private var isAnimating = false
+
+    init {
+        updatePaints()
+        prefsManager.prefs.registerOnSharedPreferenceChangeListener(this)
+    }
+
+    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+        updatePaints()
+    }
+
+    private fun updatePaints() {
+        val baseColor = prefsManager.dotColor
+        val alpha = (prefsManager.dotOpacity * 255).toInt()
+        
+        dotPaint.color = Color.argb(alpha, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
+        outlinePaint.alpha = alpha
+    }
 
     private val animationRunnable = object : Runnable {
         override fun run() {
             if (!isAnimating) return
             
-            // apply a minimum speed so the balls always move slowly downward
-            // to show that the overlay is functioning even without GPS speed.
-            speedOffset += (currentSpeed * 2f).coerceAtLeast(1f)
+            // Continuous downward speed (baseline + GPS speed)
+            speedOffset += (currentSpeed * 2f).coerceAtLeast(0.5f)
             
-            // Map 0-360 bearing to a subtle left/right sway
-            val directionRad = Math.toRadians(currentBearing.toDouble())
-            val targetOffset = Math.sin(directionRad).toFloat()
-            directionOffset += (targetOffset - directionOffset) * 0.1f // smooth interpolation
+            // Smoothly interpolate tilt (Low pass filter effect)
+            tiltXOffset += (targetTiltX - tiltXOffset) * 0.15f
+            tiltYOffset += (targetTiltY - tiltYOffset) * 0.15f
             
             invalidate()
             postOnAnimation(this)
@@ -59,29 +75,44 @@ class DotsOverlayView(context: Context) : View(context) {
         super.onDraw(canvas)
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
-        // Make the scrolling wrap around seamlessly
-        val yShift = speedOffset % dotSpacing
+        val dotRadius = prefsManager.dotSize
+        val dotSpacing = prefsManager.dotSpacing
+        val numDotsY = prefsManager.verticalRows
         
-        // Direction offset shifts X
-        val maxOffset = 150f
-        val currentXOffset = (directionOffset * maxOffset).coerceIn(-maxOffset, maxOffset)
+        val totalYShift = (speedOffset + tiltYOffset) % dotSpacing
+        
+        // Define margins
+        val sideMargin = 30f
+        val columnGap = dotRadius * 2.5f
 
-        // Draw left side dots
-        drawDotGrid(canvas, 50f + currentXOffset, yShift)
+        // Draw Left Side (2 columns)
+        val leftCol1X = sideMargin + tiltXOffset
+        val leftCol2X = sideMargin + columnGap + tiltXOffset
         
-        // Draw right side dots
-        drawDotGrid(canvas, width - 50f - (numDotsX * dotSpacing) + currentXOffset, yShift)
+        // Draw Right Side (2 columns)
+        val rightCol1X = width - sideMargin - columnGap + tiltXOffset
+        val rightCol2X = width - sideMargin + tiltXOffset
+
+        for (j in -5 until numDotsY) {
+            val baseY = (j * dotSpacing) + totalYShift
+            
+            // Column 1 (outer left, non-staggered)
+            drawDot(canvas, leftCol1X, baseY, dotRadius)
+            
+            // Column 2 (inner left, staggered)
+            drawDot(canvas, leftCol2X, baseY + (dotSpacing / 2f), dotRadius)
+            
+            // Column 3 (inner right, staggered)
+            drawDot(canvas, rightCol1X, baseY + (dotSpacing / 2f), dotRadius)
+            
+            // Column 4 (outer right, non-staggered)
+            drawDot(canvas, rightCol2X, baseY, dotRadius)
+        }
     }
 
-    private fun drawDotGrid(canvas: Canvas, startX: Float, yShift: Float) {
-        for (i in 0 until numDotsX) {
-            for (j in -5 until numDotsY) {
-                val x = startX + (i * dotSpacing)
-                val y = (j * dotSpacing) + yShift
-                canvas.drawCircle(x, y, dotRadius, dotPaint)
-                canvas.drawCircle(x, y, dotRadius, outlinePaint)
-            }
-        }
+    private fun drawDot(canvas: Canvas, x: Float, y: Float, radius: Float) {
+        canvas.drawCircle(x, y, radius, dotPaint)
+        canvas.drawCircle(x, y, radius, outlinePaint)
     }
 
     fun startAnimation() {
@@ -96,8 +127,21 @@ class DotsOverlayView(context: Context) : View(context) {
         removeCallbacks(animationRunnable)
     }
 
-    fun updateMotionData(speed: Float, bearing: Float) {
+    fun updateMotionData(speed: Float) {
         currentSpeed = speed
-        currentBearing = bearing
+    }
+
+    // gravityX and gravityY from sensor
+    fun updateTilt(gravityX: Float, gravityY: Float) {
+        // gravityX is negative when left side tilts down. We want dots to move right (+X)
+        targetTiltX = -gravityX * 20f
+        
+        // gravityY is positive when top is up. We want tilt forwards/backwards to shift dots.
+        targetTiltY = gravityY * 20f 
+    }
+    
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        prefsManager.prefs.unregisterOnSharedPreferenceChangeListener(this)
     }
 }

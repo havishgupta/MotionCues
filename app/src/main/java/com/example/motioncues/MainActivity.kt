@@ -11,11 +11,22 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 
@@ -32,20 +43,37 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val prefsManager = PreferencesManager(this)
 
         setContent {
-            MaterialTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    MotionCuesScreen(
-                        onStartService = { startMotionService() },
-                        onStopService = { stopMotionService() },
-                        onRequestPermissions = { requestAllPermissions() }
-                    )
+            MaterialTheme(colorScheme = darkColorScheme()) {
+                Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = { Text("Vehicle Motion Cues") },
+                            colors = TopAppBarDefaults.topAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        )
+                    }
+                ) { innerPadding ->
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        MotionCuesScreen(
+                            prefsManager = prefsManager,
+                            onStartService = { startMotionService() },
+                            onStopService = { stopMotionService() },
+                            onRequestPermissions = { requestAllPermissions() }
+                        )
+                    }
                 }
             }
         }
@@ -121,34 +149,140 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MotionCuesScreen(
+    prefsManager: PreferencesManager,
     onStartService: () -> Unit,
     onStopService: () -> Unit,
     onRequestPermissions: () -> Unit
 ) {
+    val scrollState = rememberScrollState()
+
+    var dotSize by remember { mutableStateOf(prefsManager.dotSize) }
+    var dotSpacing by remember { mutableStateOf(prefsManager.dotSpacing) }
+    var dotOpacity by remember { mutableStateOf(prefsManager.dotOpacity) }
+    var dotColor by remember { mutableStateOf(prefsManager.dotColor) }
+
+    val presetColors = listOf(
+        android.graphics.Color.BLACK,
+        android.graphics.Color.DKGRAY,
+        android.graphics.Color.parseColor("#1976D2"), // Blue
+        android.graphics.Color.parseColor("#388E3C"), // Green
+        android.graphics.Color.parseColor("#D32F2F")  // Red
+    )
+
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = "Vehicle Motion Cues", style = MaterialTheme.typography.headlineMedium)
         
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        Button(onClick = onRequestPermissions) {
-            Text("1. Grant Permissions")
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Controls", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Button(onClick = onRequestPermissions, modifier = Modifier.fillMaxWidth()) {
+                    Text("1. Grant Permissions")
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Button(onClick = onStartService, modifier = Modifier.weight(1f)) {
+                        Text("2. Start")
+                    }
+                    Button(
+                        onClick = onStopService, 
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Stop")
+                    }
+                }
+            }
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            Button(onClick = onStartService) {
-                Text("2. Start Cues")
-            }
-            
-            Button(onClick = onStopService, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
-                Text("Stop Cues")
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Appearance Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Color Picker
+                Text("Dot Color", style = MaterialTheme.typography.bodyMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    presetColors.forEach { colorInt ->
+                        val isSelected = dotColor == colorInt
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color(colorInt))
+                                .border(
+                                    width = if (isSelected) 3.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
+                                    shape = CircleShape
+                                )
+                                .clickable {
+                                    dotColor = colorInt
+                                    prefsManager.dotColor = colorInt
+                                }
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Dot Size
+                Text("Dot Size: ${dotSize.toInt()}", style = MaterialTheme.typography.bodyMedium)
+                Slider(
+                    value = dotSize,
+                    onValueChange = { 
+                        dotSize = it
+                        prefsManager.dotSize = it
+                    },
+                    valueRange = 8f..30f
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Dot Spacing
+                Text("Dot Spacing: ${dotSpacing.toInt()}", style = MaterialTheme.typography.bodyMedium)
+                Slider(
+                    value = dotSpacing,
+                    onValueChange = { 
+                        dotSpacing = it
+                        prefsManager.dotSpacing = it
+                    },
+                    valueRange = 40f..150f
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Opacity
+                Text("Opacity: ${(dotOpacity * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+                Slider(
+                    value = dotOpacity,
+                    onValueChange = { 
+                        dotOpacity = it
+                        prefsManager.dotOpacity = it
+                    },
+                    valueRange = 0.1f..1f
+                )
             }
         }
     }

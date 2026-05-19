@@ -1,6 +1,5 @@
 package com.example.motioncues
 
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
@@ -8,6 +7,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.location.Location
 import android.os.Build
 import android.os.IBinder
@@ -22,17 +25,23 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 
-class MotionService : Service() {
+class MotionService : Service(), SensorEventListener {
 
     private lateinit var windowManager: WindowManager
     private var dotsOverlayView: DotsOverlayView? = null
+    
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
+    
+    private lateinit var sensorManager: SensorManager
+    private var gravitySensor: Sensor? = null
 
     override fun onCreate() {
         super.onCreate()
         
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        gravitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY)
 
         createNotificationChannel()
         val notification = NotificationCompat.Builder(this, "MotionCuesChannel")
@@ -49,6 +58,10 @@ class MotionService : Service() {
 
         setupOverlay()
         startLocationUpdates()
+        
+        gravitySensor?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
+        }
     }
 
     private fun setupOverlay() {
@@ -72,7 +85,6 @@ class MotionService : Service() {
         layoutParams.gravity = Gravity.TOP or Gravity.START
         windowManager.addView(dotsOverlayView, layoutParams)
         
-        // Start the animation loop directly on the View
         dotsOverlayView?.startAnimation()
     }
 
@@ -85,8 +97,7 @@ class MotionService : Service() {
             override fun onLocationResult(locationResult: LocationResult) {
                 for (location in locationResult.locations) {
                     val speed = if (location.hasSpeed()) location.speed else 0f
-                    val bearing = if (location.hasBearing()) location.bearing else 0f
-                    dotsOverlayView?.updateMotionData(speed, bearing)
+                    dotsOverlayView?.updateMotionData(speed)
                 }
             }
         }
@@ -102,12 +113,25 @@ class MotionService : Service() {
         }
     }
 
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event?.sensor?.type == Sensor.TYPE_GRAVITY) {
+            val gx = event.values[0]
+            val gy = event.values[1]
+            dotsOverlayView?.updateTilt(gx, gy)
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         
         try {
             fusedLocationClient.removeLocationUpdates(locationCallback)
         } catch (e: Exception) {}
+        
+        sensorManager.unregisterListener(this)
         
         if (dotsOverlayView != null) {
             try {
