@@ -255,7 +255,7 @@ fun Slide2() {
         initialValue = -20f,
         targetValue = 20f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = SineEasing),
+            animation = tween(1000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "eye"
@@ -264,7 +264,7 @@ fun Slide2() {
         initialValue = 20f,
         targetValue = -20f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1300, easing = SineEasing), // Out of sync timing
+            animation = tween(1300, easing = FastOutSlowInEasing), // Out of sync timing
             repeatMode = RepeatMode.Reverse
         ),
         label = "ear"
@@ -311,7 +311,7 @@ fun Slide3() {
         initialValue = -80f,
         targetValue = 80f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = SineEasing),
+            animation = tween(2000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "dot"
