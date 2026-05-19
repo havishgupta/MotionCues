@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Sample data extraction rules. In your app, you may want to restrict
+   what gets extracted.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="file" path="."/>
+        <include domain="database" path="."/>
+        <include domain="sharedpref" path="."/>
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="."/>
+        <include domain="database" path="."/>
+        <include domain="sharedpref" path="."/>
+    </device-transfer>
+</data-extraction-rules>
