@@ -64,11 +64,11 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
             filteredSpeed += (currentSpeed - filteredSpeed) * 0.05f
             
             // Speed controls downward scrolling. If speed is 0, it doesn't scroll automatically.
-            speedOffset += filteredSpeed * 1.5f
+            speedOffset += filteredSpeed * 1.5f * prefsManager.speedMultiplier
             
             // Smoothly interpolate tilt (Low pass filter effect)
-            tiltXOffset += (targetTiltX - tiltXOffset) * 0.1f
-            tiltYOffset += (targetTiltY - tiltYOffset) * 0.1f
+            tiltXOffset += (targetTiltX - tiltXOffset) * 0.1f * prefsManager.tiltSensitivity
+            tiltYOffset += (targetTiltY - tiltYOffset) * 0.1f * prefsManager.tiltSensitivity
             
             invalidate()
             postOnAnimation(this)

@@ -26,4 +26,12 @@ class PreferencesManager(context: Context) {
     var verticalRows: Int
         get() = prefs.getInt("vertical_rows", 30)
         set(value) = prefs.edit().putInt("vertical_rows", value).apply()
+        
+    var tiltSensitivity: Float
+        get() = prefs.getFloat("tilt_sensitivity", 1.0f)
+        set(value) = prefs.edit().putFloat("tilt_sensitivity", value).apply()
+        
+    var speedMultiplier: Float
+        get() = prefs.getFloat("speed_multiplier", 1.0f)
+        set(value) = prefs.edit().putFloat("speed_multiplier", value).apply()
 }

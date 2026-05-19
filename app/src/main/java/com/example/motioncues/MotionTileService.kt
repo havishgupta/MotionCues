@@ -37,10 +37,15 @@ class MotionTileService : TileService() {
             stopService(Intent(this, MotionService::class.java))
         } else {
             val serviceIntent = Intent(this, MotionService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent)
-            } else {
-                startService(serviceIntent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(serviceIntent)
+                } else {
+                    startService(serviceIntent)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // Fallback: prompt user to open app
             }
         }
         

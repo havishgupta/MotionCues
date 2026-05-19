@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
@@ -45,39 +47,27 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val prefsManager = PreferencesManager(this)
 
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
-                Scaffold(
-                    topBar = {
-                        TopAppBar(
-                            title = { Text("Vehicle Motion Cues", fontWeight = FontWeight.Bold) },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.surface,
-                                titleContentColor = MaterialTheme.colorScheme.onSurface
-                            )
-                        )
-                    }
-                ) { innerPadding ->
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding),
-                        color = MaterialTheme.colorScheme.background
-                    ) {
-                        MotionCuesScreen(
-                            prefsManager = prefsManager,
-                            onStartService = { startMotionService() },
-                            onStopService = { stopMotionService() },
-                            onRequestPermissions = { requestAllPermissions() },
-                            checkPermissions = { hasRequiredPermissions() },
-                            checkOverlay = { Settings.canDrawOverlays(this) }
-                        )
-                    }
+                var showSettings by remember { mutableStateOf(false) }
+                
+                if (showSettings) {
+                    SettingsScreen(
+                        prefsManager = prefsManager,
+                        onBack = { showSettings = false },
+                        onRequestPermissions = { requestAllPermissions() },
+                        checkPermissions = { hasRequiredPermissions() },
+                        checkOverlay = { Settings.canDrawOverlays(this) }
+                    )
+                } else {
+                    MainScreen(
+                        onOpenSettings = { showSettings = true },
+                        onToggleService = { toggleMotionService() }
+                    )
                 }
             }
         }
@@ -123,39 +113,107 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun startMotionService() {
-        if (Settings.canDrawOverlays(this) && hasRequiredPermissions()) {
-            val serviceIntent = Intent(this, MotionService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    private fun toggleMotionService() {
+        if (MotionService.isRunning) {
+            stopService(Intent(this, MotionService::class.java))
+        } else {
+            if (Settings.canDrawOverlays(this) && hasRequiredPermissions()) {
+                val serviceIntent = Intent(this, MotionService::class.java)
                 try {
-                    startForegroundService(serviceIntent)
-                    Toast.makeText(this, "Cues Started", Toast.LENGTH_SHORT).show()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(serviceIntent)
+                    } else {
+                        startService(serviceIntent)
+                    }
                 } catch (e: Exception) {
-                    Toast.makeText(this, "Error starting service: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "Failed to start: ${e.message}", Toast.LENGTH_LONG).show()
                     e.printStackTrace()
                 }
             } else {
-                startService(serviceIntent)
-                Toast.makeText(this, "Cues Started", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Please grant all permissions in Settings first", Toast.LENGTH_LONG).show()
+                requestAllPermissions()
             }
-        } else {
-            Toast.makeText(this, "Please grant all permissions (including Location and Overlay) first", Toast.LENGTH_LONG).show()
-            requestAllPermissions()
         }
-    }
-
-    private fun stopMotionService() {
-        val serviceIntent = Intent(this, MotionService::class.java)
-        stopService(serviceIntent)
-        Toast.makeText(this, "Cues Stopped", Toast.LENGTH_SHORT).show()
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MotionCuesScreen(
+fun MainScreen(
+    onOpenSettings: () -> Unit,
+    onToggleService: () -> Unit
+) {
+    // Poll the service state
+    var isServiceRunning by remember { mutableStateOf(MotionService.isRunning) }
+    LaunchedEffect(Unit) {
+        while(true) {
+            isServiceRunning = MotionService.isRunning
+            kotlinx.coroutines.delay(500)
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { },
+                actions = {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", modifier = Modifier.size(32.dp))
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Motion Cues",
+                fontSize = 42.sp,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = if (isServiceRunning) "Active" else "Inactive",
+                fontSize = 20.sp,
+                color = if (isServiceRunning) Color.Green else Color.Gray
+            )
+
+            Spacer(modifier = Modifier.height(64.dp))
+
+            // Big Start/Stop Button
+            Box(
+                modifier = Modifier
+                    .size(200.dp)
+                    .clip(CircleShape)
+                    .background(if (isServiceRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+                    .clickable { onToggleService() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (isServiceRunning) "STOP" else "START",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(
     prefsManager: PreferencesManager,
-    onStartService: () -> Unit,
-    onStopService: () -> Unit,
+    onBack: () -> Unit,
     onRequestPermissions: () -> Unit,
     checkPermissions: () -> Boolean,
     checkOverlay: () -> Boolean
@@ -166,10 +224,12 @@ fun MotionCuesScreen(
     var dotSpacing by remember { mutableStateOf(prefsManager.dotSpacing) }
     var dotOpacity by remember { mutableStateOf(prefsManager.dotOpacity) }
     var dotColor by remember { mutableStateOf(prefsManager.dotColor) }
+    var tiltSensitivity by remember { mutableStateOf(prefsManager.tiltSensitivity) }
+    var speedMultiplier by remember { mutableStateOf(prefsManager.speedMultiplier) }
 
     val presetColors = listOf(
-        android.graphics.Color.BLACK,
-        android.graphics.Color.DKGRAY,
+        Color.BLACK.toArgb(),
+        Color.DKGRAY.toArgb(),
         android.graphics.Color.parseColor("#1976D2"), // Blue
         android.graphics.Color.parseColor("#388E3C"), // Green
         android.graphics.Color.parseColor("#D32F2F")  // Red
@@ -186,140 +246,153 @@ fun MotionCuesScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Setup & Controls", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(if (locationGranted) Color.Green else Color.Red))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (locationGranted) "Location: Granted" else "Location: Missing", fontWeight = FontWeight.Medium)
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(if (overlayGranted) Color.Green else Color.Red))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (overlayGranted) "Overlay: Granted" else "Overlay: Missing", fontWeight = FontWeight.Medium)
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Button(onClick = onRequestPermissions, modifier = Modifier.fillMaxWidth()) {
-                    Text("Grant Required Permissions")
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Button(
-                        onClick = onStartService, 
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                    ) {
-                        Text("Start Cues")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                    Button(
-                        onClick = onStopService, 
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    ) {
-                        Text("Stop Cues")
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                )
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(innerPadding)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            
+            // Permissions Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Permissions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(if (locationGranted) Color.Green else Color.Red))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (locationGranted) "Location: Granted" else "Location: Missing", fontWeight = FontWeight.Medium)
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(if (overlayGranted) Color.Green else Color.Red))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (overlayGranted) "Overlay: Granted" else "Overlay: Missing", fontWeight = FontWeight.Medium)
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Button(onClick = onRequestPermissions, modifier = Modifier.fillMaxWidth()) {
+                        Text("Grant Required Permissions")
                     }
                 }
             }
-        }
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Appearance Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Color Picker
-                Text("Dot Color", style = MaterialTheme.typography.bodyMedium)
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    presetColors.forEach { colorInt ->
-                        val isSelected = dotColor == colorInt
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(Color(colorInt))
-                                .border(
-                                    width = if (isSelected) 3.dp else 1.dp,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
-                                    shape = CircleShape
-                                )
-                                .clickable {
-                                    dotColor = colorInt
-                                    prefsManager.dotColor = colorInt
-                                }
-                        )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Appearance Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Appearance", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text("Dot Color", style = MaterialTheme.typography.bodyMedium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        presetColors.forEach { colorInt ->
+                            val isSelected = dotColor == colorInt
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(colorInt))
+                                    .border(
+                                        width = if (isSelected) 3.dp else 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
+                                        shape = CircleShape
+                                    )
+                                    .clickable {
+                                        dotColor = colorInt
+                                        prefsManager.dotColor = colorInt
+                                    }
+                            )
+                        }
                     }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Dot Size
-                Text("Dot Size: ${dotSize.toInt()}", style = MaterialTheme.typography.bodyMedium)
-                Slider(
-                    value = dotSize,
-                    onValueChange = { 
-                        dotSize = it
-                        prefsManager.dotSize = it
-                    },
-                    valueRange = 8f..30f
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // Dot Spacing
-                Text("Dot Spacing: ${dotSpacing.toInt()}", style = MaterialTheme.typography.bodyMedium)
-                Slider(
-                    value = dotSpacing,
-                    onValueChange = { 
-                        dotSpacing = it
-                        prefsManager.dotSpacing = it
-                    },
-                    valueRange = 40f..150f
-                )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text("Dot Size: ${dotSize.toInt()}", style = MaterialTheme.typography.bodyMedium)
+                    Slider(
+                        value = dotSize,
+                        onValueChange = { dotSize = it; prefsManager.dotSize = it },
+                        valueRange = 8f..30f
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text("Dot Spacing: ${dotSpacing.toInt()}", style = MaterialTheme.typography.bodyMedium)
+                    Slider(
+                        value = dotSpacing,
+                        onValueChange = { dotSpacing = it; prefsManager.dotSpacing = it },
+                        valueRange = 40f..150f
+                    )
 
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // Opacity
-                Text("Opacity: ${(dotOpacity * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
-                Slider(
-                    value = dotOpacity,
-                    onValueChange = { 
-                        dotOpacity = it
-                        prefsManager.dotOpacity = it
-                    },
-                    valueRange = 0.1f..1f
-                )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text("Opacity: ${(dotOpacity * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+                    Slider(
+                        value = dotOpacity,
+                        onValueChange = { dotOpacity = it; prefsManager.dotOpacity = it },
+                        valueRange = 0.1f..1f
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Physics Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Physics Tuning", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text("Tilt Sensitivity: ${String.format("%.1fx", tiltSensitivity)}", style = MaterialTheme.typography.bodyMedium)
+                    Slider(
+                        value = tiltSensitivity,
+                        onValueChange = { tiltSensitivity = it; prefsManager.tiltSensitivity = it },
+                        valueRange = 0.1f..3.0f
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text("Speed Multiplier: ${String.format("%.1fx", speedMultiplier)}", style = MaterialTheme.typography.bodyMedium)
+                    Slider(
+                        value = speedMultiplier,
+                        onValueChange = { speedMultiplier = it; prefsManager.speedMultiplier = it },
+                        valueRange = 0.1f..3.0f
+                    )
+                }
             }
         }
     }
