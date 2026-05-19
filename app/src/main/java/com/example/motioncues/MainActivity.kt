@@ -228,8 +228,8 @@ fun SettingsScreen(
     var speedMultiplier by remember { mutableStateOf(prefsManager.speedMultiplier) }
 
     val presetColors = listOf(
-        Color.BLACK.toArgb(),
-        Color.DKGRAY.toArgb(),
+        android.graphics.Color.BLACK,
+        android.graphics.Color.DKGRAY,
         android.graphics.Color.parseColor("#1976D2"), // Blue
         android.graphics.Color.parseColor("#388E3C"), // Green
         android.graphics.Color.parseColor("#D32F2F")  // Red
