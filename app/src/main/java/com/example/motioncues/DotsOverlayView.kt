@@ -76,8 +76,8 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
             tiltXOffset += (targetTiltX - tiltXOffset) * 0.1f * prefsManager.speedMultiplier
             tiltYOffset += (targetTiltY - tiltYOffset) * 0.1f * prefsManager.speedMultiplier
             
-            // Continuous flow based on GPS speed
-            gpsSpeedFlow += currentGpsSpeed * 3f * prefsManager.speedMultiplier
+            // Continuous flow based on GPS speed (amplified x15 for stronger visual feedback)
+            gpsSpeedFlow += currentGpsSpeed * 15f * prefsManager.speedMultiplier
             if (prefsManager.dotSpacing > 0) {
                 gpsSpeedFlow %= (prefsManager.dotSpacing * 2) // Wrap around over 2 dot spacings to be safe
             }
@@ -99,38 +99,29 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
         
         // Margin so dots have space to slide into
         val sideMargin = 80f
-        val columnGap = dotRadius * 3.5f
 
         val finalOffsetX = tiltXOffset
         val finalOffsetY = tiltYOffset + gpsSpeedFlow
 
-        // Draw Left Side (2 columns)
-        val leftCol1X = sideMargin + finalOffsetX
-        val leftCol2X = sideMargin + columnGap + finalOffsetX
+        // Draw Left Side (1 column)
+        val leftColX = sideMargin + finalOffsetX
         
-        // Draw Right Side (2 columns)
-        val rightCol1X = width - sideMargin - columnGap + finalOffsetX
-        val rightCol2X = width - sideMargin + finalOffsetX
+        // Draw Right Side (1 column)
+        val rightColX = width - sideMargin + finalOffsetX
 
-        // Outer dots are larger
-        val outerRadius = dotRadius * 1.5f
-        val innerRadius = dotRadius * 0.8f
+        // Alternating radii
+        val bigRadius = dotRadius * 1.5f
+        val smallRadius = dotRadius * 0.8f
 
         // Massive iteration window so when it shifts 1000px up/down, you never see the end of the dots
         for (j in -30 until numDotsY + 30) {
             val baseY = (j * dotSpacing) + finalOffsetY
             
-            // Column 1 (outer left, non-staggered)
-            drawDot(canvas, leftCol1X, baseY, outerRadius)
+            // Alternating pattern: Big, Small, Big, Small
+            val currentRadius = if (j % 2 == 0) bigRadius else smallRadius
             
-            // Column 2 (inner left, staggered)
-            drawDot(canvas, leftCol2X, baseY + (dotSpacing / 2f), innerRadius)
-            
-            // Column 3 (inner right, staggered)
-            drawDot(canvas, rightCol1X, baseY + (dotSpacing / 2f), innerRadius)
-            
-            // Column 4 (outer right, non-staggered)
-            drawDot(canvas, rightCol2X, baseY, outerRadius)
+            drawDot(canvas, leftColX, baseY, currentRadius)
+            drawDot(canvas, rightColX, baseY, currentRadius)
         }
 
         if (prefsManager.debugMode) {
@@ -174,9 +165,9 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
     fun updateTilt(accelX: Float, accelY: Float) {
         lastAccelX = accelX
         lastAccelY = accelY
-        // Massive limits allowing for extreme visual sliding across screen
-        targetTiltX = (-accelX * 60f * prefsManager.tiltSensitivity).coerceIn(-800f, 800f)
-        targetTiltY = (accelY * 60f * prefsManager.tiltSensitivity).coerceIn(-1200f, 1200f)
+        // Massive limits and x300 multiplier to make it ultra-responsive
+        targetTiltX = (-accelX * 300f * prefsManager.tiltSensitivity).coerceIn(-1000f, 1000f)
+        targetTiltY = (accelY * 300f * prefsManager.tiltSensitivity).coerceIn(-1500f, 1500f)
     }
 
     fun updateSpeed(speed: Float) {

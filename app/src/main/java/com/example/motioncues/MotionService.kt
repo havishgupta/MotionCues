@@ -12,18 +12,21 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
 import android.os.Build
-import android.os.Bundle
 import android.os.IBinder
+import android.os.Looper
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 
-class MotionService : Service(), SensorEventListener, LocationListener {
+class MotionService : Service(), SensorEventListener {
 
     companion object {
         var isRunning = false
@@ -36,7 +39,8 @@ class MotionService : Service(), SensorEventListener, LocationListener {
     private lateinit var sensorManager: SensorManager
     private var accelSensor: Sensor? = null
     
-    private lateinit var locationManager: LocationManager
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var locationCallback: LocationCallback
 
     override fun onCreate() {
         super.onCreate()
@@ -45,7 +49,7 @@ class MotionService : Service(), SensorEventListener, LocationListener {
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
         
-        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         createNotificationChannel()
         val notification = NotificationCompat.Builder(this, "MotionCuesChannel")
@@ -68,15 +72,32 @@ class MotionService : Service(), SensorEventListener, LocationListener {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
         }
         
+        setupLocationUpdates()
+    }
+    
+    private fun setupLocationUpdates() {
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 500)
+            .setMinUpdateIntervalMillis(200)
+            .build()
+            
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                for (location in locationResult.locations) {
+                    val speed = if (location.hasSpeed()) location.speed else 0f
+                    dotsOverlayView?.updateSpeed(speed)
+                    dotsOverlayView?.updateDebugLocation(location.latitude, location.longitude)
+                }
+            }
+        }
+        
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             try {
-                if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                    locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 500, 0f, this)
-                }
-                if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                    locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 500, 0f, this)
-                }
+                fusedLocationClient.requestLocationUpdates(
+                    locationRequest,
+                    locationCallback,
+                    Looper.getMainLooper()
+                )
             } catch (e: Exception) {}
         }
     }
@@ -114,16 +135,6 @@ class MotionService : Service(), SensorEventListener, LocationListener {
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-    
-    override fun onLocationChanged(location: Location) {
-        val speed = location.speed
-        dotsOverlayView?.updateSpeed(speed)
-        dotsOverlayView?.updateDebugLocation(location.latitude, location.longitude)
-    }
-
-    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
-    override fun onProviderEnabled(provider: String) {}
-    override fun onProviderDisabled(provider: String) {}
 
     override fun onDestroy() {
         super.onDestroy()
@@ -131,7 +142,7 @@ class MotionService : Service(), SensorEventListener, LocationListener {
         
         sensorManager.unregisterListener(this)
         try {
-            locationManager.removeUpdates(this)
+            fusedLocationClient.removeLocationUpdates(locationCallback)
         } catch (e: Exception) {}
         
         if (dotsOverlayView != null) {
