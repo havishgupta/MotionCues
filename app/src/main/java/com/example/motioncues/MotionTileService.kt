@@ -1,6 +1,8 @@
 package com.example.motioncues
 
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -10,6 +12,17 @@ import android.service.quicksettings.TileService
 import androidx.core.content.ContextCompat
 
 class MotionTileService : TileService() {
+
+    companion object {
+        fun requestTileStateUpdate(context: Context) {
+            try {
+                TileService.requestListeningState(
+                    context,
+                    ComponentName(context, MotionTileService::class.java)
+                )
+            } catch (e: Exception) {}
+        }
+    }
 
     override fun onStartListening() {
         super.onStartListening()
@@ -46,7 +59,16 @@ class MotionTileService : TileService() {
         }
 
         if (MotionService.isRunning) {
-            stopService(Intent(this, MotionService::class.java))
+            val serviceIntent = Intent(this, MotionService::class.java)
+            stopService(serviceIntent)
+            
+            // Optimistically update tile state
+            val tile = qsTile
+            if (tile != null) {
+                tile.state = Tile.STATE_INACTIVE
+                tile.label = "Cues Off"
+                tile.updateTile()
+            }
         } else {
             val serviceIntent = Intent(this, MotionService::class.java)
             try {
@@ -55,16 +77,31 @@ class MotionTileService : TileService() {
                 } else {
                     startService(serviceIntent)
                 }
+                
+                // Optimistically update tile state
+                val tile = qsTile
+                if (tile != null) {
+                    tile.state = Tile.STATE_ACTIVE
+                    tile.label = "Cues On"
+                    tile.updateTile()
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
-                // Fallback: prompt user to open app
+                // Fallback: prompt user to open app if background start failed
+                val intent = Intent(this, MainActivity::class.java)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    startActivityAndCollapse(
+                        android.app.PendingIntent.getActivity(
+                            this, 0, intent, android.app.PendingIntent.FLAG_IMMUTABLE
+                        )
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    startActivityAndCollapse(intent)
+                }
             }
         }
-        
-        // Brief delay to allow service to start/stop before updating tile UI
-        android.os.Handler(mainLooper).postDelayed({
-            updateTileState()
-        }, 200)
     }
 
     private fun updateTileState() {

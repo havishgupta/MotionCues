@@ -45,6 +45,7 @@ class MotionService : Service(), SensorEventListener {
     override fun onCreate() {
         super.onCreate()
         isRunning = true
+        MotionTileService.requestTileStateUpdate(this)
         
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
@@ -139,6 +140,7 @@ class MotionService : Service(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
+        MotionTileService.requestTileStateUpdate(this)
         
         sensorManager.unregisterListener(this)
         try {
