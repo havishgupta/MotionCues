@@ -36,9 +36,6 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
     private var currentGpsSpeed: Float = 0f
     private var gpsSpeedFlow: Float = 0f
 
-    private var jitterX: Float = 0f
-    private var jitterY: Float = 0f
-
     private var isAnimating = false
 
     private var lastAccelX: Float = 0f
@@ -54,17 +51,6 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
         setShadowLayer(5f, 0f, 0f, Color.BLACK)
     }
 
-    private data class Dot(
-        var baseX: Float,
-        var baseY: Float,
-        var radius: Float,
-        var speedMultiplier: Float,
-        var isLeft: Boolean
-    )
-    
-    private val dots = mutableListOf<Dot>()
-    private var isInitialized = false
-
     init {
         updatePaints()
         prefsManager.prefs.registerOnSharedPreferenceChangeListener(this)
@@ -72,7 +58,6 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         updatePaints()
-        isInitialized = false // Re-initialize dots on pref change (e.g. size/color)
     }
 
     private fun updatePaints() {
@@ -92,47 +77,14 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
             tiltYOffset += (targetTiltY - tiltYOffset) * 0.1f * prefsManager.speedMultiplier
             
             // Continuous flow based on GPS speed
-            // No need to wrap this variable anymore since individual dots modulo wrap their position
             gpsSpeedFlow += currentGpsSpeed * 3f * prefsManager.speedMultiplier
-
-            // Jitter for extra realism/sensory feedback
-            jitterX = (Math.random().toFloat() - 0.5f) * 6f * prefsManager.speedMultiplier
-            jitterY = (Math.random().toFloat() - 0.5f) * 6f * prefsManager.speedMultiplier
+            if (prefsManager.dotSpacing > 0) {
+                gpsSpeedFlow %= (prefsManager.dotSpacing * 2) // Wrap around over 2 dot spacings to be safe
+            }
             
             invalidate()
             postOnAnimation(this)
         }
-    }
-
-    private fun initializeDots(w: Int, h: Int) {
-        dots.clear()
-        // Total dots based on preferences
-        val numDots = prefsManager.verticalRows * 6 
-        val dotRadius = prefsManager.dotSize
-        
-        // Define two "lanes" on the sides
-        val sideMargin = 60f
-        val laneWidth = dotRadius * 5f
-        
-        for (i in 0 until numDots) {
-            val isLeft = i % 2 == 0
-            
-            // Randomize position within the lane
-            val laneStartX = if (isLeft) sideMargin else (w - sideMargin - laneWidth)
-            val baseX = laneStartX + Math.random().toFloat() * laneWidth
-            
-            // Random Y across the whole extended height
-            val baseY = Math.random().toFloat() * (h + 400f) - 200f
-            
-            // Random size variation per dot (0.6x to 1.4x)
-            val radius = dotRadius * (0.6f + Math.random().toFloat() * 0.8f)
-            
-            // Random speed variation so they drift apart organically
-            val speedMult = 0.7f + Math.random().toFloat() * 0.6f
-            
-            dots.add(Dot(baseX, baseY, radius, speedMult, isLeft))
-        }
-        isInitialized = true
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -141,21 +93,44 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
 
         if (width == 0 || height == 0) return
 
-        if (!isInitialized) {
-            initializeDots(width, height)
-        }
+        val dotRadius = prefsManager.dotSize
+        val dotSpacing = prefsManager.dotSpacing
+        val numDotsY = prefsManager.verticalRows
+        
+        // Margin so dots have space to slide into
+        val sideMargin = 80f
+        val columnGap = dotRadius * 3.5f
 
-        val wrapHeight = height + 400f // Extension top and bottom to avoid popping
+        val finalOffsetX = tiltXOffset
+        val finalOffsetY = tiltYOffset + gpsSpeedFlow
 
-        for (dot in dots) {
-            // Apply global offsets and speed flow, then add individual speed and jitter
-            val currentY = dot.baseY + tiltYOffset + (gpsSpeedFlow * dot.speedMultiplier) + jitterY
-            val currentX = dot.baseX + tiltXOffset + jitterX
+        // Draw Left Side (2 columns)
+        val leftCol1X = sideMargin + finalOffsetX
+        val leftCol2X = sideMargin + columnGap + finalOffsetX
+        
+        // Draw Right Side (2 columns)
+        val rightCol1X = width - sideMargin - columnGap + finalOffsetX
+        val rightCol2X = width - sideMargin + finalOffsetX
 
-            // Wrap vertically so the particle system is infinite
-            val wrappedY = ((currentY + 200f) % wrapHeight + wrapHeight) % wrapHeight - 200f
+        // Outer dots are larger
+        val outerRadius = dotRadius * 1.5f
+        val innerRadius = dotRadius * 0.8f
 
-            drawDot(canvas, currentX, wrappedY, dot.radius)
+        // Massive iteration window so when it shifts 1000px up/down, you never see the end of the dots
+        for (j in -30 until numDotsY + 30) {
+            val baseY = (j * dotSpacing) + finalOffsetY
+            
+            // Column 1 (outer left, non-staggered)
+            drawDot(canvas, leftCol1X, baseY, outerRadius)
+            
+            // Column 2 (inner left, staggered)
+            drawDot(canvas, leftCol2X, baseY + (dotSpacing / 2f), innerRadius)
+            
+            // Column 3 (inner right, staggered)
+            drawDot(canvas, rightCol1X, baseY + (dotSpacing / 2f), innerRadius)
+            
+            // Column 4 (outer right, non-staggered)
+            drawDot(canvas, rightCol2X, baseY, outerRadius)
         }
 
         if (prefsManager.debugMode) {
