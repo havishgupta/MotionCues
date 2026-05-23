@@ -569,6 +569,7 @@ fun SettingsScreen(
     var dotOpacity by remember { mutableStateOf(prefsManager.dotOpacity) }
     var dotColor by remember { mutableStateOf(prefsManager.dotColor) }
     var tiltSensitivity by remember { mutableStateOf(prefsManager.tiltSensitivity) }
+    var gpsSensitivity by remember { mutableStateOf(prefsManager.gpsSensitivity) }
     var speedMultiplier by remember { mutableStateOf(prefsManager.speedMultiplier) }
 
     val presetColors = listOf(
@@ -719,10 +720,19 @@ fun SettingsScreen(
                     Text("Physics & Tuning", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    Text("Sensitivity (Distance Travelled): ${String.format("%.1fx", tiltSensitivity)}", style = MaterialTheme.typography.bodyMedium)
+                    Text("Accel Sensitivity (Left/Right/Up/Down): ${String.format("%.1fx", tiltSensitivity)}", style = MaterialTheme.typography.bodyMedium)
                     Slider(
                         value = tiltSensitivity,
                         onValueChange = { tiltSensitivity = it; prefsManager.tiltSensitivity = it },
+                        valueRange = 0.1f..4.0f
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text("GPS Sensitivity (Forward/Backward): ${String.format("%.1fx", gpsSensitivity)}", style = MaterialTheme.typography.bodyMedium)
+                    Slider(
+                        value = gpsSensitivity,
+                        onValueChange = { gpsSensitivity = it; prefsManager.gpsSensitivity = it },
                         valueRange = 0.1f..4.0f
                     )
                     

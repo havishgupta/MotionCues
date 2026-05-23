@@ -34,6 +34,10 @@ class PreferencesManager(context: Context) {
     var tiltSensitivity: Float
         get() = prefs.getFloat("tilt_sensitivity", 1.0f)
         set(value) = prefs.edit().putFloat("tilt_sensitivity", value).apply()
+
+    var gpsSensitivity: Float
+        get() = prefs.getFloat("gps_sensitivity", 1.0f)
+        set(value) = prefs.edit().putFloat("gps_sensitivity", value).apply()
         
     var speedMultiplier: Float
         get() = prefs.getFloat("speed_multiplier", 1.0f)

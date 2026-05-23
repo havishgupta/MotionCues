@@ -77,7 +77,7 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
             tiltYOffset += (targetTiltY - tiltYOffset) * 0.1f * prefsManager.speedMultiplier
             
             // Continuous flow based on GPS speed (amplified x15 for stronger visual feedback)
-            gpsSpeedFlow += currentGpsSpeed * 15f * prefsManager.speedMultiplier
+            gpsSpeedFlow += currentGpsSpeed * 15f * prefsManager.gpsSensitivity * prefsManager.speedMultiplier
             if (prefsManager.dotSpacing > 0) {
                 gpsSpeedFlow %= (prefsManager.dotSpacing * 2) // Wrap around over 2 dot spacings to be safe
             }
@@ -99,15 +99,18 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
         
         // Margin so dots have space to slide into
         val sideMargin = 80f
+        val columnGap = dotRadius * 3.5f
 
         val finalOffsetX = tiltXOffset
         val finalOffsetY = tiltYOffset + gpsSpeedFlow
 
-        // Draw Left Side (1 column)
-        val leftColX = sideMargin + finalOffsetX
+        // Draw Left Side (2 columns)
+        val leftCol1X = sideMargin + finalOffsetX
+        val leftCol2X = sideMargin + columnGap + finalOffsetX
         
-        // Draw Right Side (1 column)
-        val rightColX = width - sideMargin + finalOffsetX
+        // Draw Right Side (2 columns)
+        val rightCol1X = width - sideMargin - columnGap + finalOffsetX
+        val rightCol2X = width - sideMargin + finalOffsetX
 
         // Alternating radii
         val bigRadius = dotRadius * 1.5f
@@ -118,10 +121,14 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
             val baseY = (j * dotSpacing) + finalOffsetY
             
             // Alternating pattern: Big, Small, Big, Small
-            val currentRadius = if (j % 2 == 0) bigRadius else smallRadius
+            val radius1 = if (j % 2 == 0) bigRadius else smallRadius
+            val radius2 = if (j % 2 == 0) smallRadius else bigRadius // staggered visually
             
-            drawDot(canvas, leftColX, baseY, currentRadius)
-            drawDot(canvas, rightColX, baseY, currentRadius)
+            drawDot(canvas, leftCol1X, baseY, radius1)
+            drawDot(canvas, leftCol2X, baseY + (dotSpacing / 2f), radius2)
+            
+            drawDot(canvas, rightCol1X, baseY + (dotSpacing / 2f), radius2)
+            drawDot(canvas, rightCol2X, baseY, radius1)
         }
 
         if (prefsManager.debugMode) {
