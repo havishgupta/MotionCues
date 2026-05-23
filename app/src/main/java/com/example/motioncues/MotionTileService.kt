@@ -70,36 +70,26 @@ class MotionTileService : TileService() {
                 tile.updateTile()
             }
         } else {
-            val serviceIntent = Intent(this, MotionService::class.java)
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(serviceIntent)
-                } else {
-                    startService(serviceIntent)
-                }
-                
-                // Optimistically update tile state
-                val tile = qsTile
-                if (tile != null) {
-                    tile.state = Tile.STATE_ACTIVE
-                    tile.label = "Cues On"
-                    tile.updateTile()
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                // Fallback: prompt user to open app if background start failed
-                val intent = Intent(this, MainActivity::class.java)
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    startActivityAndCollapse(
-                        android.app.PendingIntent.getActivity(
-                            this, 0, intent, android.app.PendingIntent.FLAG_IMMUTABLE
-                        )
+            val intent = Intent(this, ToggleActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startActivityAndCollapse(
+                    android.app.PendingIntent.getActivity(
+                        this, 0, intent, android.app.PendingIntent.FLAG_IMMUTABLE
                     )
-                } else {
-                    @Suppress("DEPRECATION")
-                    startActivityAndCollapse(intent)
-                }
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                startActivityAndCollapse(intent)
+            }
+            
+            // Optimistically update tile state
+            val tile = qsTile
+            if (tile != null) {
+                tile.state = Tile.STATE_ACTIVE
+                tile.label = "Cues On"
+                tile.updateTile()
             }
         }
     }
