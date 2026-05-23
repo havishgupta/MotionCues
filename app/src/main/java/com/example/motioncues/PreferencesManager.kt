@@ -38,4 +38,8 @@ class PreferencesManager(context: Context) {
     var speedMultiplier: Float
         get() = prefs.getFloat("speed_multiplier", 1.0f)
         set(value) = prefs.edit().putFloat("speed_multiplier", value).apply()
+        
+    var debugMode: Boolean
+        get() = prefs.getBoolean("debug_mode", false)
+        set(value) = prefs.edit().putBoolean("debug_mode", value).apply()
 }

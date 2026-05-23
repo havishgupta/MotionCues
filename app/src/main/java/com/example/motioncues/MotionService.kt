@@ -55,7 +55,9 @@ class MotionService : Service(), SensorEventListener, LocationListener {
             .build()
         
         if (Build.VERSION.SDK_INT >= 34) { // UPSIDE_DOWN_CAKE
-            startForeground(1, notification, 1073741824) // FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            startForeground(1, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        } else if (Build.VERSION.SDK_INT >= 29) {
+            startForeground(1, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
         } else {
             startForeground(1, notification)
         }
@@ -66,9 +68,15 @@ class MotionService : Service(), SensorEventListener, LocationListener {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
         }
         
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             try {
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 500, 0f, this)
+                if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 500, 0f, this)
+                }
+                if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                    locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 500, 0f, this)
+                }
             } catch (e: Exception) {}
         }
     }
@@ -110,6 +118,7 @@ class MotionService : Service(), SensorEventListener, LocationListener {
     override fun onLocationChanged(location: Location) {
         val speed = location.speed
         dotsOverlayView?.updateSpeed(speed)
+        dotsOverlayView?.updateDebugLocation(location.latitude, location.longitude)
     }
 
     override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}

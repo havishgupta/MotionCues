@@ -736,6 +736,29 @@ fun SettingsScreen(
                     )
                 }
             }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                var debugMode by remember { mutableStateOf(prefsManager.debugMode) }
+                Row(
+                    modifier = Modifier.padding(20.dp).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Debug Mode (Show Sensor/GPS Data)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Switch(
+                        checked = debugMode,
+                        onCheckedChange = { 
+                            debugMode = it
+                            prefsManager.debugMode = it
+                        }
+                    )
+                }
+            }
         }
     }
 }

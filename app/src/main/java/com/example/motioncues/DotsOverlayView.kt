@@ -41,6 +41,19 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
 
     private var isAnimating = false
 
+    private var lastAccelX: Float = 0f
+    private var lastAccelY: Float = 0f
+    private var lastLat: Double = 0.0
+    private var lastLon: Double = 0.0
+    
+    private val debugTextPaint = Paint().apply {
+        color = Color.GREEN
+        textSize = 40f
+        isAntiAlias = true
+        style = Paint.Style.FILL
+        setShadowLayer(5f, 0f, 0f, Color.BLACK)
+    }
+
     private data class Dot(
         var baseX: Float,
         var baseY: Float,
@@ -144,6 +157,26 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
 
             drawDot(canvas, currentX, wrappedY, dot.radius)
         }
+
+        if (prefsManager.debugMode) {
+            val debugLines = listOf(
+                "Debug Mode Active",
+                "Accel X: ${String.format("%.2f", lastAccelX)}",
+                "Accel Y: ${String.format("%.2f", lastAccelY)}",
+                "GPS Lat: ${String.format("%.5f", lastLat)}",
+                "GPS Lon: ${String.format("%.5f", lastLon)}",
+                "Speed (m/s): ${String.format("%.2f", currentGpsSpeed)}",
+                "Flow Y: ${String.format("%.2f", gpsSpeedFlow)}"
+            )
+
+            var textY = 100f
+            for (line in debugLines) {
+                // Draw in top right
+                val textWidth = debugTextPaint.measureText(line)
+                canvas.drawText(line, width - textWidth - 40f, textY, debugTextPaint)
+                textY += 50f
+            }
+        }
     }
 
     private fun drawDot(canvas: Canvas, x: Float, y: Float, radius: Float) {
@@ -164,6 +197,8 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
     }
 
     fun updateTilt(accelX: Float, accelY: Float) {
+        lastAccelX = accelX
+        lastAccelY = accelY
         // Massive limits allowing for extreme visual sliding across screen
         targetTiltX = (-accelX * 60f * prefsManager.tiltSensitivity).coerceIn(-800f, 800f)
         targetTiltY = (accelY * 60f * prefsManager.tiltSensitivity).coerceIn(-1200f, 1200f)
@@ -171,6 +206,11 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
 
     fun updateSpeed(speed: Float) {
         currentGpsSpeed = speed
+    }
+
+    fun updateDebugLocation(lat: Double, lon: Double) {
+        lastLat = lat
+        lastLon = lon
     }
     
     override fun onDetachedFromWindow() {
