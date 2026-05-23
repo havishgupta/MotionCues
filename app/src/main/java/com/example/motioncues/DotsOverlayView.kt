@@ -33,6 +33,12 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
     private var targetTiltX: Float = 0f
     private var targetTiltY: Float = 0f
 
+    private var currentGpsSpeed: Float = 0f
+    private var gpsSpeedFlow: Float = 0f
+
+    private var jitterX: Float = 0f
+    private var jitterY: Float = 0f
+
     private var isAnimating = false
 
     init {
@@ -60,6 +66,16 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
             tiltXOffset += (targetTiltX - tiltXOffset) * 0.1f * prefsManager.speedMultiplier
             tiltYOffset += (targetTiltY - tiltYOffset) * 0.1f * prefsManager.speedMultiplier
             
+            // Continuous flow based on GPS speed
+            gpsSpeedFlow += currentGpsSpeed * 3f * prefsManager.speedMultiplier
+            if (prefsManager.dotSpacing > 0) {
+                gpsSpeedFlow %= (prefsManager.dotSpacing * 2) // Wrap around over 2 dot spacings to be safe
+            }
+
+            // Jitter for extra realism/sensory feedback as requested
+            jitterX = (Math.random().toFloat() - 0.5f) * 6f * prefsManager.speedMultiplier
+            jitterY = (Math.random().toFloat() - 0.5f) * 6f * prefsManager.speedMultiplier
+            
             invalidate()
             postOnAnimation(this)
         }
@@ -77,13 +93,16 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
         val sideMargin = 80f
         val columnGap = dotRadius * 3.5f
 
+        val finalOffsetX = tiltXOffset + jitterX
+        val finalOffsetY = tiltYOffset + gpsSpeedFlow + jitterY
+
         // Draw Left Side (2 columns)
-        val leftCol1X = sideMargin + tiltXOffset
-        val leftCol2X = sideMargin + columnGap + tiltXOffset
+        val leftCol1X = sideMargin + finalOffsetX
+        val leftCol2X = sideMargin + columnGap + finalOffsetX
         
         // Draw Right Side (2 columns)
-        val rightCol1X = width - sideMargin - columnGap + tiltXOffset
-        val rightCol2X = width - sideMargin + tiltXOffset
+        val rightCol1X = width - sideMargin - columnGap + finalOffsetX
+        val rightCol2X = width - sideMargin + finalOffsetX
 
         // Outer dots are larger
         val outerRadius = dotRadius * 1.5f
@@ -91,7 +110,7 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
 
         // Massive iteration window so when it shifts 1000px up/down, you never see the end of the dots
         for (j in -30 until numDotsY + 30) {
-            val baseY = (j * dotSpacing) + tiltYOffset
+            val baseY = (j * dotSpacing) + finalOffsetY
             
             // Column 1 (outer left, non-staggered)
             drawDot(canvas, leftCol1X, baseY, outerRadius)
@@ -128,6 +147,10 @@ class DotsOverlayView(context: Context) : View(context), SharedPreferences.OnSha
         // Massive limits allowing for extreme visual sliding across screen
         targetTiltX = (-accelX * 60f * prefsManager.tiltSensitivity).coerceIn(-800f, 800f)
         targetTiltY = (accelY * 60f * prefsManager.tiltSensitivity).coerceIn(-1200f, 1200f)
+    }
+
+    fun updateSpeed(speed: Float) {
+        currentGpsSpeed = speed
     }
     
     override fun onDetachedFromWindow() {

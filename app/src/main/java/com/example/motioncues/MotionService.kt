@@ -1,22 +1,29 @@
 package com.example.motioncues
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.PixelFormat
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.os.Build
+import android.os.Bundle
 import android.os.IBinder
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 
-class MotionService : Service(), SensorEventListener {
+class MotionService : Service(), SensorEventListener, LocationListener {
 
     companion object {
         var isRunning = false
@@ -28,6 +35,8 @@ class MotionService : Service(), SensorEventListener {
     
     private lateinit var sensorManager: SensorManager
     private var accelSensor: Sensor? = null
+    
+    private lateinit var locationManager: LocationManager
 
     override fun onCreate() {
         super.onCreate()
@@ -35,6 +44,8 @@ class MotionService : Service(), SensorEventListener {
         
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
+        
+        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
         createNotificationChannel()
         val notification = NotificationCompat.Builder(this, "MotionCuesChannel")
@@ -53,6 +64,12 @@ class MotionService : Service(), SensorEventListener {
         
         accelSensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
+        }
+        
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 500, 0f, this)
+            } catch (e: Exception) {}
         }
     }
 
@@ -89,12 +106,24 @@ class MotionService : Service(), SensorEventListener {
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    
+    override fun onLocationChanged(location: Location) {
+        val speed = location.speed
+        dotsOverlayView?.updateSpeed(speed)
+    }
+
+    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+    override fun onProviderEnabled(provider: String) {}
+    override fun onProviderDisabled(provider: String) {}
 
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
         
         sensorManager.unregisterListener(this)
+        try {
+            locationManager.removeUpdates(this)
+        } catch (e: Exception) {}
         
         if (dotsOverlayView != null) {
             try {
