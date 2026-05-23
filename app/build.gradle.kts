@@ -12,9 +12,9 @@ android {
         minSdk = 26
         targetSdk = 34
         
-        val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
-        versionCode = runNumber
-        versionName = "1.0.$runNumber"
+        val timeCode = (System.currentTimeMillis() / 1000).toInt()
+        versionCode = timeCode
+        versionName = "1.0.$timeCode"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
